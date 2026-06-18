@@ -13,11 +13,12 @@ module.exports = async function handler(req, res) {
 
   try {
     const { phone, method } = req.body || {};
-    const formattedPhone = "+1" + phone.replace(/\D/g, "").slice(-10);
 
-    if (!formattedphone) {
+    if (!phone) {
       return res.status(400).json({ error: "Phone number is required" });
     }
+
+    const formattedPhone = "+1" + phone.replace(/\D/g, "").slice(-10);
 
     const client = twilio(
       process.env.TWILIO_ACCOUNT_SID,
@@ -27,11 +28,11 @@ module.exports = async function handler(req, res) {
     await client.verify.v2
       .services(process.env.TWILIO_VERIFY_SERVICE_SID)
       .verifications.create({
-        to: phone,
+        to: formattedPhone,
         channel: method === "call" ? "call" : "sms"
       });
 
-    return res.status(200).json({ success: true });
+    return res.status(200).json({ success: true, to: formattedPhone });
   } catch (error) {
     return res.status(500).json({
       error: "Failed to send OTP",
