@@ -13,8 +13,9 @@ module.exports = async function handler(req, res) {
 
   try {
     const { phone, method } = req.body || {};
+    const formattedPhone = "+1" + phone.replace(/\D/g, "").slice(-10);
 
-    if (!phone) {
+    if (!formattedphone) {
       return res.status(400).json({ error: "Phone number is required" });
     }
 
