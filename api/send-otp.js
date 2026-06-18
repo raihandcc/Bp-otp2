@@ -12,34 +12,46 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const { phone, code } = req.body || {};
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
+    const { phone, method } = body;
 
-    if (!phone || !code) {
-      return res.status(400).json({ error: "Phone and code are required" });
+    if (!phone) {
+      return res.status(400).json({
+        error: "Phone number is required",
+        receivedBody: body
+      });
     }
 
-    const formattedPhone = "+1" + phone.replace(/\D/g, "").slice(-10);
+    const digits = phone.replace(/\D/g, "").slice(-10);
+    const formattedPhone = "+1" + digits;
+
+    if (digits.length !== 10) {
+      return res.status(400).json({
+        error: "Invalid phone number",
+        receivedPhone: phone,
+        formattedPhone
+      });
+    }
 
     const client = twilio(
       process.env.TWILIO_ACCOUNT_SID,
       process.env.TWILIO_AUTH_TOKEN
     );
 
-    const result = await client.verify.v2
+    await client.verify.v2
       .services(process.env.TWILIO_VERIFY_SERVICE_SID)
-      .verificationChecks.create({
+      .verifications.create({
         to: formattedPhone,
-        code: code
+        channel: method === "call" ? "call" : "sms"
       });
 
-    if (result.status === "approved") {
-      return res.status(200).json({ verified: true });
-    }
-
-    return res.status(400).json({ verified: false });
+    return res.status(200).json({
+      success: true,
+      to: formattedPhone
+    });
   } catch (error) {
     return res.status(500).json({
-      error: "Verification failed",
+      error: "Failed to send OTP",
       details: error.message
     });
   }
