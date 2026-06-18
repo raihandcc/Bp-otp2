@@ -7,21 +7,48 @@ module.exports = async function handler(req, res) {
 
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  const client = twilio(
-    process.env.TWILIO_ACCOUNT_SID,
-    process.env.TWILIO_AUTH_TOKEN
-  );
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Use POST request only" });
+  }
 
-  const { phone, code } = req.body;
+  try {
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
+    const { phone, code } = body;
 
-  const result = await client.verify.v2
-    .services(process.env.TWILIO_VERIFY_SERVICE_SID)
-    .verificationChecks.create({
-      to: phone,
-      code
+    if (!phone || !code) {
+      return res.status(400).json({
+        error: "Phone and code are required",
+        receivedBody: body
+      });
+    }
+
+    const digits = phone.replace(/\D/g, "").slice(-10);
+    const formattedPhone = "+1" + digits;
+
+    const client = twilio(
+      process.env.TWILIO_ACCOUNT_SID,
+      process.env.TWILIO_AUTH_TOKEN
+    );
+
+    const result = await client.verify.v2
+      .services(process.env.TWILIO_VERIFY_SERVICE_SID)
+      .verificationChecks.create({
+        to: formattedPhone,
+        code: code
+      });
+
+    if (result.status === "approved") {
+      return res.status(200).json({ verified: true });
+    }
+
+    return res.status(400).json({
+      verified: false,
+      status: result.status
     });
-
-  return res.status(200).json({
-    verified: result.status === "approved"
-  });
+  } catch (error) {
+    return res.status(500).json({
+      error: "Verification failed",
+      details: error.message
+    });
+  }
 };
