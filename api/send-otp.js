@@ -12,10 +12,10 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const { phone, method } = req.body || {};
+    const { phone, code } = req.body || {};
 
-    if (!phone) {
-      return res.status(400).json({ error: "Phone number is required" });
+    if (!phone || !code) {
+      return res.status(400).json({ error: "Phone and code are required" });
     }
 
     const formattedPhone = "+1" + phone.replace(/\D/g, "").slice(-10);
@@ -25,17 +25,21 @@ module.exports = async function handler(req, res) {
       process.env.TWILIO_AUTH_TOKEN
     );
 
-    await client.verify.v2
+    const result = await client.verify.v2
       .services(process.env.TWILIO_VERIFY_SERVICE_SID)
-      .verifications.create({
+      .verificationChecks.create({
         to: formattedPhone,
-        channel: method === "call" ? "call" : "sms"
+        code: code
       });
 
-    return res.status(200).json({ success: true, to: formattedPhone });
+    if (result.status === "approved") {
+      return res.status(200).json({ verified: true });
+    }
+
+    return res.status(400).json({ verified: false });
   } catch (error) {
     return res.status(500).json({
-      error: "Failed to send OTP",
+      error: "Verification failed",
       details: error.message
     });
   }
